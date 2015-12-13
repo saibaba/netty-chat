@@ -8,12 +8,12 @@ A Clojure project to play with netty and build netty-chat application.
 * lein compile (generates aot classes)
 
 ### Run
-* IN one window:
+In one window:
 * lein repl
 * (require '[netty-chat.server])
 * (netty-chat.server/run 8888)
 
-* In some multiple windows:
+In some multiple windows:
 * lein repl
 * (require '[netty-chat.client])
 * (netty-chat.client/run "localhost" 8888)
