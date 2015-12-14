@@ -1,5 +1,8 @@
 (ns netty-chat.server
   (:import
+    io.netty.channel.ChannelOutboundHandler
+    io.netty.handler.logging.LoggingHandler
+    io.netty.handler.logging.LogLevel
     io.netty.channel.group.DefaultChannelGroup
     io.netty.util.concurrent.GlobalEventExecutor
     io.netty.bootstrap.ServerBootstrap
@@ -26,9 +29,9 @@
 (def client-channels-for-chat-server (DefaultChannelGroup. (GlobalEventExecutor/INSTANCE)))
 
 (defn create-write-to-channel
-  [incoming message]
+  [ctx incoming message]
   (fn [channel]
-    (let [msg (str message "\r\n")]
+    (let [msg message]
       (println (str "[DEBUG] - will write to connected channels" msg))
       (if (= incoming channel)
         (.write channel (str "YOU SAID *** " msg))
@@ -42,14 +45,14 @@
         remoteAddress (.remoteAddress incoming)]
     (.add client-channels-for-chat-server incoming)
     ; calling doall to realize the lazy sequence created by map
-    (doall (map (create-write-to-channel incoming (str "[" remoteAddress "] has joined!")) client-channels-for-chat-server))))
+    (doall (map (create-write-to-channel ctx incoming (str "[" remoteAddress "] has joined!")) client-channels-for-chat-server))))
 
 (defn chat-server-handler-handlerRemoved
   [this ctx]
   (let [incoming (.channel ctx)
         remoteAddress (.remoteAddress incoming)]
     ; calling doall to realize the lazy sequence created by map
-    (doall (map (create-write-to-channel incoming (str "[" remoteAddress "] has left!") ) client-channels-for-chat-server))
+    (doall (map (create-write-to-channel ctx incoming (str "[" remoteAddress "] has left!") ) client-channels-for-chat-server))
     (.remove client-channels-for-chat-server incoming) ))
 
 (defn chat-server-handler-channelRead0
@@ -58,8 +61,19 @@
         remoteAddress (.remoteAddress incoming)]
     (println (str "[DEBUG] - channelRead0 rcvd " message))
     ; calling doall to realize the lazy sequence created by map
-    (doall (map (create-write-to-channel incoming (str "[" remoteAddress "]" message)) client-channels-for-chat-server))))
-    
+    (doall (map (create-write-to-channel ctx incoming (str "[" remoteAddress "]" message)) client-channels-for-chat-server))))
+
+(gen-class
+  :name   netty_chat.protocol.NewLineAddingChannelHandler
+  :main   false
+  :extends io.netty.channel.ChannelOutboundHandlerAdapter
+  :prefix "newline-adding-channel-handler-")
+
+(defn newline-adding-channel-handler-write
+  [this ctx msg promise]
+  (println (str "[DEBUG] - newline adder handler -  will add new line to " msg))
+  (.writeAndFlush ctx (str msg "\r\n") promise))
+
 (gen-class
   :name   netty_chat.server.ChatServerInitializer
   :extends io.netty.channel.ChannelInitializer
@@ -71,10 +85,13 @@
   (println (str "Channel initialized for " socketChannel))
   (let [pipeline (.pipeline socketChannel)
         frameDetector (DelimiterBasedFrameDecoder. 8192 (Delimiters/lineDelimiter)) ]
-    (.addLast pipeline "framer" frameDetector)
-    (.addLast pipeline "decoder" (StringDecoder.))
-    (.addLast pipeline "encoder" (StringEncoder.))
-    (.addLast pipeline "handler" (netty_chat.server.ChatServerHandler. ))))
+    (doto pipeline
+      (.addLast "logger" (LoggingHandler. LogLevel/DEBUG))
+      (.addLast "framer" frameDetector)
+      (.addLast "decoder" (StringDecoder.))
+      (.addLast "encoder" (StringEncoder.))
+      (.addLast "addnewlinehandler" (netty_chat.protocol.NewLineAddingChannelHandler. ))
+      (.addLast "handler" (netty_chat.server.ChatServerHandler. )))))
 
 (defn new-boss-group
   []
