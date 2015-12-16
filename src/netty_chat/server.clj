@@ -1,22 +1,11 @@
 (ns netty-chat.server
+  (:use [netty-chat.newline-protocol])
   (:import
-    io.netty.channel.ChannelOutboundHandler
-    io.netty.handler.logging.LoggingHandler
-    io.netty.handler.logging.LogLevel
     io.netty.channel.group.DefaultChannelGroup
     io.netty.util.concurrent.GlobalEventExecutor
     io.netty.bootstrap.ServerBootstrap
-    io.netty.channel.Channel
-    io.netty.channel.EventLoopGroup
     io.netty.channel.nio.NioEventLoopGroup
     io.netty.channel.SimpleChannelInboundHandler
-    io.netty.channel.ChannelInitializer
-    io.netty.channel.ChannelPipeline
-    io.netty.channel.socket.SocketChannel
-    io.netty.handler.codec.DelimiterBasedFrameDecoder
-    io.netty.handler.codec.Delimiters
-    io.netty.handler.codec.string.StringDecoder
-    io.netty.handler.codec.string.StringEncoder
     io.netty.channel.socket.nio.NioServerSocketChannel))
 
 (gen-class
@@ -36,7 +25,6 @@
       (if (= incoming channel)
         (.write channel (str "YOU SAID *** " msg))
         (.write channel msg))
-      (.flush channel)
       channel)))
 
 (defn chat-server-handler-handlerAdded
@@ -63,36 +51,6 @@
     ; calling doall to realize the lazy sequence created by map
     (doall (map (create-write-to-channel ctx incoming (str "[" remoteAddress "]" message)) client-channels-for-chat-server))))
 
-(gen-class
-  :name   netty_chat.protocol.NewLineAddingChannelHandler
-  :main   false
-  :extends io.netty.channel.ChannelOutboundHandlerAdapter
-  :prefix "newline-adding-channel-handler-")
-
-(defn newline-adding-channel-handler-write
-  [this ctx msg promise]
-  (println (str "[DEBUG] - newline adder handler -  will add new line to " msg))
-  (.writeAndFlush ctx (str msg "\r\n") promise))
-
-(gen-class
-  :name   netty_chat.server.ChatServerInitializer
-  :extends io.netty.channel.ChannelInitializer
-  :main   false
-  :prefix "chat-server-initializer-")
-
-(defn chat-server-initializer-initChannel
-  [this socketChannel]
-  (println (str "Channel initialized for " socketChannel))
-  (let [pipeline (.pipeline socketChannel)
-        frameDetector (DelimiterBasedFrameDecoder. 8192 (Delimiters/lineDelimiter)) ]
-    (doto pipeline
-      (.addLast "logger" (LoggingHandler. LogLevel/DEBUG))
-      (.addLast "framer" frameDetector)
-      (.addLast "decoder" (StringDecoder.))
-      (.addLast "encoder" (StringEncoder.))
-      (.addLast "addnewlinehandler" (netty_chat.protocol.NewLineAddingChannelHandler. ))
-      (.addLast "handler" (netty_chat.server.ChatServerHandler. )))))
-
 (defn new-boss-group
   []
   (new NioEventLoopGroup))
@@ -106,7 +64,7 @@
   (doto (new ServerBootstrap)
     (.group boss worker)
     (.channel NioServerSocketChannel)
-    (.childHandler (netty_chat.server.ChatServerInitializer. ))))
+    (.childHandler (create-chat-channel-handler netty_chat.server.ChatServerHandler))))
 
 (defn new-channel
   [bootstrap port]

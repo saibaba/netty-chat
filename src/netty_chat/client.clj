@@ -1,17 +1,9 @@
 (ns netty-chat.client
+  (:use [netty-chat.newline-protocol])
   (:import
     io.netty.bootstrap.Bootstrap
-    io.netty.channel.Channel
-    io.netty.channel.EventLoopGroup
     io.netty.channel.nio.NioEventLoopGroup
     io.netty.channel.SimpleChannelInboundHandler
-    io.netty.channel.ChannelInitializer
-    io.netty.channel.ChannelPipeline
-    io.netty.channel.socket.SocketChannel
-    io.netty.handler.codec.DelimiterBasedFrameDecoder
-    io.netty.handler.codec.Delimiters
-    io.netty.handler.codec.string.StringDecoder
-    io.netty.handler.codec.string.StringEncoder
     io.netty.channel.socket.nio.NioSocketChannel))
 
 (gen-class
@@ -24,21 +16,6 @@
   [this channelHandlerContext message]
     (println message))
 
-(gen-class
-  :name   netty_chat.client.ChatClientInitializer
-  :extends io.netty.channel.ChannelInitializer
-  :main   false
-  :prefix "chat-client-initializer-")
-
-(defn chat-client-initializer-initChannel
-  [this socketChannel]
-  (let [pipeline (.pipeline socketChannel)
-        frameDetector (DelimiterBasedFrameDecoder. 8192 (Delimiters/lineDelimiter)) ]
-    (.addLast pipeline "framer" frameDetector)
-    (.addLast pipeline "decoder" (StringDecoder.))
-    (.addLast pipeline "encoder" (StringEncoder.))
-    (.addLast pipeline "handler" (netty_chat.client.ChatClientHandler. ))))
-
 (defn new-group
   []
   (new NioEventLoopGroup))
@@ -48,7 +25,7 @@
   (doto (new Bootstrap)
     (.group g)
     (.channel NioSocketChannel)
-    (.handler (netty_chat.client.ChatClientInitializer. ))))
+    (.handler (create-chat-channel-handler netty_chat.client.ChatClientHandler))))
 
 (defn new-channel
   [bootstrap host port]
@@ -60,8 +37,7 @@
         bootstrap (new-bootstrap group)
         channel (new-channel bootstrap host port)]
     (loop []
-      (let [l (read-line) o (str l "\r\n")]
+      (let [l (read-line) o (str l)]
         (println (str "[DEBUG] - sending to server: " o))
         (.write channel o)
-        (.flush channel)
         (recur)))))
