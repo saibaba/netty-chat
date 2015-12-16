@@ -16,7 +16,7 @@ In one window:
 In some multiple windows:
 * lein repl
 * (require '[netty-chat.client])
-* (netty-chat.client/run "localhost" 8888)
+* (netty-chat.client/run "user" "localhost" 8888)
 * type some messages in each window and observe as they show up in other windows
 
 ## TODO
