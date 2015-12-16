@@ -18,13 +18,13 @@
 (def client-channels-for-chat-server (DefaultChannelGroup. (GlobalEventExecutor/INSTANCE)))
 
 (defn create-write-to-channel
-  [ctx incoming message]
+  [ctx incoming msg]
   (fn [channel]
-    (let [msg message]
-      (println (str "[DEBUG] - will write to connected channels" msg))
+    (let [message (:message msg) user (:user msg)]
+      (println (str "[DEBUG] " user " - will write to connected channels" message))
       (if (= incoming channel)
-        (.write channel (str "YOU SAID *** " msg))
-        (.write channel msg))
+        (.write channel {:message message :user (str user "(me)") } )
+        (.write channel {:message message :user user}))
       channel)))
 
 (defn chat-server-handler-handlerAdded
@@ -33,23 +33,23 @@
         remoteAddress (.remoteAddress incoming)]
     (.add client-channels-for-chat-server incoming)
     ; calling doall to realize the lazy sequence created by map
-    (doall (map (create-write-to-channel ctx incoming (str "[" remoteAddress "] has joined!")) client-channels-for-chat-server))))
+    (doall (map (create-write-to-channel ctx incoming {:message (str "[" remoteAddress "] has joined!") :user remoteAddress} ) client-channels-for-chat-server))))
 
 (defn chat-server-handler-handlerRemoved
   [this ctx]
   (let [incoming (.channel ctx)
         remoteAddress (.remoteAddress incoming)]
     ; calling doall to realize the lazy sequence created by map
-    (doall (map (create-write-to-channel ctx incoming (str "[" remoteAddress "] has left!") ) client-channels-for-chat-server))
+    (doall (map (create-write-to-channel ctx incoming {:message (str "[" remoteAddress "] has left!") :user remoteAddress} ) client-channels-for-chat-server))
     (.remove client-channels-for-chat-server incoming) ))
 
-(defn chat-server-handler-channelRead0
+(defn chat-server-handler-channelRead
   [this ctx message]
   (let [incoming (.channel ctx)
         remoteAddress (.remoteAddress incoming)]
-    (println (str "[DEBUG] - channelRead0 rcvd " message))
+    (println (str "[DEBUG] - channelRead rcvd " message))
     ; calling doall to realize the lazy sequence created by map
-    (doall (map (create-write-to-channel ctx incoming (str "[" remoteAddress "]" message)) client-channels-for-chat-server))))
+    (doall (map (create-write-to-channel ctx incoming message) client-channels-for-chat-server))))
 
 (defn new-boss-group
   []

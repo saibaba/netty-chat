@@ -12,9 +12,9 @@
   :main   false
   :prefix "chat-client-handler-")
  
-(defn chat-client-handler-channelRead0
-  [this channelHandlerContext message]
-    (println message))
+(defn chat-client-handler-channelRead
+  [this channelHandlerContext msg]
+    (println (str "[" (:user msg) "] " (:message msg))))
 
 (defn new-group
   []
@@ -32,12 +32,12 @@
   (.channel (.sync (.connect bootstrap host port))))
 
 (defn run
-  [host port]
+  [user host port]
   (let [group (new-group)
         bootstrap (new-bootstrap group)
         channel (new-channel bootstrap host port)]
     (loop []
       (let [l (read-line) o (str l)]
         (println (str "[DEBUG] - sending to server: " o))
-        (.write channel o)
+        (.write channel { :user user :message o})
         (recur)))))
