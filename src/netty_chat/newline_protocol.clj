@@ -73,3 +73,4 @@
 (defn create-chat-channel-handler
   [app-handler-class]
   (netty_chat.protocol.ChatChannelInitializer. app-handler-class))
+
