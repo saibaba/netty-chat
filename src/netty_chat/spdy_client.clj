@@ -1,5 +1,5 @@
-(ns netty-chat.client
-  (:use [netty-chat.newline-protocol])
+(ns netty-chat.spdy-client
+  (:use [netty-chat.spdy-protocol])
   (:import
     io.netty.bootstrap.Bootstrap
     io.netty.channel.nio.NioEventLoopGroup
@@ -7,12 +7,12 @@
     io.netty.channel.socket.nio.NioSocketChannel))
 
 (gen-class
-  :name   netty_chat.client.ChatClientHandler
+  :name   netty_chat.client.SpdyChatClientHandler
   :extends io.netty.channel.SimpleChannelInboundHandler
   :main   false
-  :prefix "chat-client-handler-")
+  :prefix "spdy-chat-client-handler-")
  
-(defn chat-client-handler-channelRead
+(defn spdy-chat-client-handler-channelRead
   [this channelHandlerContext msg]
     (println (str "[" (:user msg) "] " (:message msg))))
 
@@ -25,7 +25,7 @@
   (doto (new Bootstrap)
     (.group g)
     (.channel NioSocketChannel)
-    (.handler (create-chat-channel-handler netty_chat.client.ChatClientHandler))))
+    (.handler (create-spdy-chat-channel-handler netty_chat.client.SpdyChatClientHandler false))))
 
 (defn new-channel
   [bootstrap host port]
@@ -44,4 +44,4 @@
 
 (defn -main
   [user host port]
-  (netty-chat.client/run user host port))
+  (netty-chat.spdy-client/run user host port))

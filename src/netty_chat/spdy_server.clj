@@ -1,5 +1,5 @@
-(ns netty-chat.server
-  (:use [netty-chat.newline-protocol])
+(ns netty-chat.spdy-server
+  (:use [netty-chat.spdy-protocol])
   (:import
     io.netty.channel.group.DefaultChannelGroup
     io.netty.util.concurrent.GlobalEventExecutor
@@ -9,11 +9,11 @@
     io.netty.channel.socket.nio.NioServerSocketChannel))
 
 (gen-class
-  :name   netty_chat.server.ChatServerHandler
+  :name   netty_chat.server.SpdyChatServerHandler
   :extends io.netty.channel.SimpleChannelInboundHandler
   :main   false
   :methods [ [getChannels [] io.netty.channel.group.DefaultChannelGroup]]
-  :prefix "chat-server-handler-")
+  :prefix "spdy-chat-server-handler-")
 
 (def client-channels-for-chat-server (DefaultChannelGroup. (GlobalEventExecutor/INSTANCE)))
 
@@ -23,27 +23,27 @@
     (let [message (:message msg) user (:user msg)]
       (println (str "[DEBUG] " user " - will write to connected channels" message))
       (if (= incoming channel)
-        (.write channel {:message message :user (str user "(me)") } )
-        (.write channel {:message message :user user}))
+        (.writeAndFlush channel {:message message :user (str user "(me)") } )
+        (.writeAndFlush channel {:message message :user user}))
       channel)))
 
-(defn chat-server-handler-handlerAdded
+(defn spdy-chat-server-handler-handlerAdded
   [this ctx]
   (let [incoming (.channel ctx)
         remoteAddress (.remoteAddress incoming)]
     (.add client-channels-for-chat-server incoming)
     ; calling doall to realize the lazy sequence created by map
-    (doall (map (create-write-to-channel ctx incoming {:message (str "[" remoteAddress "] has joined!") :user remoteAddress} ) client-channels-for-chat-server))))
+    (doall (map (create-write-to-channel ctx incoming {:message (str "[" remoteAddress "] has joined the conversation!") :user remoteAddress} ) client-channels-for-chat-server))))
 
-(defn chat-server-handler-handlerRemoved
+(defn spdy-chat-server-handler-handlerRemoved
   [this ctx]
   (let [incoming (.channel ctx)
         remoteAddress (.remoteAddress incoming)]
     ; calling doall to realize the lazy sequence created by map
-    (doall (map (create-write-to-channel ctx incoming {:message (str "[" remoteAddress "] has left!") :user remoteAddress} ) client-channels-for-chat-server))
+    (doall (map (create-write-to-channel ctx incoming {:message (str "[" remoteAddress "] has left the conversation!") :user remoteAddress} ) client-channels-for-chat-server))
     (.remove client-channels-for-chat-server incoming) ))
 
-(defn chat-server-handler-channelRead
+(defn spdy-chat-server-handler-channelRead
   [this ctx message]
   (let [incoming (.channel ctx)
         remoteAddress (.remoteAddress incoming)]
@@ -64,7 +64,7 @@
   (doto (new ServerBootstrap)
     (.group boss worker)
     (.channel NioServerSocketChannel)
-    (.childHandler (create-chat-channel-handler netty_chat.server.ChatServerHandler))))
+    (.childHandler (create-spdy-chat-channel-handler netty_chat.server.SpdyChatServerHandler true))))
 
 (defn new-channel
   [bootstrap port]
@@ -79,5 +79,4 @@
 
 (defn -main
   [port]
-  (netty-chat.server/run port))
-
+  (netty-chat.spdy-server/run port))
